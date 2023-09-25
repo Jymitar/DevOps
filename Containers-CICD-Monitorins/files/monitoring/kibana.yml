@@ -1,0 +1,16 @@
+server.port: 5601
+server.host: "192.168.69.123"
+server.name: "monitoring"
+elasticsearch.hosts: ["http://localhost:9200"]
+logging:
+  appenders:
+    file:
+      type: file
+      fileName: /var/log/kibana/kibana.log
+      layout:
+        type: json
+  root:
+    appenders:
+      - default
+      - file
+pid.file: /run/kibana/kibana.pid

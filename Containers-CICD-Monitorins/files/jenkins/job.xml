@@ -1,0 +1,141 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1174.vdcb_d054cf74a_">
+  <actions>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2064.v5eef7d0982b_e"/>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2064.v5eef7d0982b_e">
+      <jobProperties/>
+      <triggers/>
+      <parameters/>
+      <options/>
+    </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
+  </actions>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.34.3">
+      <projectUrl>http://192.168.69.122:3000/jmy/retake/</projectUrl>
+      <displayName></displayName>
+    </com.coravy.hudson.plugins.github.GithubProjectProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <com.cloudbees.jenkins.GitHubPushTrigger plugin="github@1.34.3">
+          <spec></spec>
+        </com.cloudbees.jenkins.GitHubPushTrigger>
+        <hudson.triggers.SCMTrigger>
+          <spec></spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@2683.vd0a_8f6a_1c263">
+    <script>pipeline 
+{
+    agent 
+    {
+        label &apos;containers&apos;
+    }
+    environment 
+    {
+        DOCKERHUB_CREDENTIALS=credentials(&apos;docker-hub&apos;)
+    }
+    stages 
+    {
+        stage(&apos;Clone&apos;) 
+        {
+            steps 
+            {
+                git branch: &apos;main&apos;, url: &apos;http://192.168.69.122:3000/jmy/retake&apos;
+            }
+        }
+        stage(&apos;Build&apos;)
+        {
+            steps
+            {
+                sh &apos;cd frontend &amp;&amp; docker image build -t img-frontend .&apos;
+                sh &apos;cd database &amp;&amp; docker image build -t img-database .&apos;
+                sh &apos;cd backend &amp;&amp; docker image build -t img-backend .&apos;
+            }
+        }
+        stage(&apos;Network&apos;)
+        {
+            steps
+            {
+                sh &apos;docker network ls | grep retake || docker network create retake&apos;
+            }
+        }
+        stage(&apos;Deploy&apos;)
+        {
+            steps
+            {
+                sh &apos;&apos;&apos;
+                docker container rm -f con-frontend || true
+                docker container run -d --name con-frontend --net retake -p 8080:5000 img-frontend
+                docker container rm -f con-database || true
+                docker container run -d --name con-database --net retake -e MYSQL_ROOT_PASSWORD=&apos;ExamPa$$w0rd&apos; img-database
+                docker container rm -f con-backend || true
+                docker container run -d --name con-backend --net retake img-backend
+              &apos;&apos;&apos;  
+            }
+        }
+        stage(&apos;Testing&apos;)
+        {
+            steps
+            {
+               echo &apos;Test #1 - reachability&apos;
+               sh &apos;echo $(curl --write-out &quot;%{http_code}&quot; --silent --output /dev/null http://192.168.69.122:8080) | grep 200&apos;
+            }
+        }
+         stage(&apos;CleanUp&apos;)
+        {
+            steps
+            {
+                sh &apos;docker container rm -f con-frontend con-database con-backend&apos;
+            }
+        }
+        stage(&apos;Docker Login&apos;)
+        {
+            steps 
+            {
+                sh &apos;echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin&apos;
+            }
+        }
+        stage(&apos;Image Publish&apos;)
+        {
+            steps 
+            {
+                echo &apos;Publish frontend img&apos;
+                sh &apos;docker image tag img-frontend jmy90/img-frontend&apos;
+                sh &apos;docker push jmy90/img-frontend&apos;
+
+                echo &apos;Publish database img&apos;
+                sh &apos;docker image tag img-database jmy90/img-database&apos;
+                sh &apos;docker push jmy90/img-database&apos;
+
+                echo &apos;Publish backend img&apos;
+                sh &apos;docker image tag img-backend jmy90/img-backend&apos;
+                sh &apos;docker push jmy90/img-backend&apos;
+             }
+        }
+        stage(&apos;Deploy Production&apos;)
+        {
+            steps
+            {
+                sh &apos;&apos;&apos;
+                docker container rm -f con-frontend || true
+                docker container run -d --name con-frontend --net retake -p 80:5000 jmy90/img-frontend
+                docker container rm -f con-database || true
+                docker container run -d --name con-database --net retake -e MYSQL_ROOT_PASSWORD=&apos;ExamPa$$w0rd&apos; jmy90/img-database
+                docker container rm -f con-backend || true
+                docker container run -d --name con-backend --net retake jmy90/img-backend
+              &apos;&apos;&apos;
+            }
+        }
+    }
+}
+</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

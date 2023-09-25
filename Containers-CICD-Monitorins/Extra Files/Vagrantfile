@@ -1,0 +1,40 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure(2) do |config|
+    
+  config.ssh.insert_key = false
+
+  config.vm.define "node1" do |node1|
+    node1.vm.box="Jmy/debian11-vmware"
+    node1.vm.hostname = "node1.do1.lab"
+    node1.vm.network "private_network", ip: "192.168.99.101"
+    #node1.vm.network "forwarded_port", guest: 80, host: 8000
+    #node1.vm.network "forwarded_port", guest: 8080, host: 8080
+	  node1.vm.provision "shell", path: "add_hosts.sh"
+    node1.vm.provision "shell", path: "install_docker_debian.sh"
+  end
+
+  config.vm.define "node2" do |node2|
+    node2.vm.box="Jmy/debian11-vmware"
+    node2.vm.hostname = "node2.do1.lab"
+    node2.vm.network "private_network", ip: "192.168.99.102"
+    #node1.vm.network "forwarded_port", guest: 80, host: 8000
+    #node1.vm.network "forwarded_port", guest: 8080, host: 8080
+    config.vm.synced_folder "goprom/", "/home/vagrant/goprom"
+	  node2.vm.provision "shell", path: "add_hosts.sh"
+    node2.vm.provision "shell", path: "install_docker_debian.sh"
+  end
+  
+  config.vm.define "node3" do |node3|
+    node3.vm.box="Jmy/centos9-vmware"
+    node3.vm.hostname = "node3.do1.lab"
+    node3.vm.network "private_network", ip: "192.168.99.103"
+    #node1.vm.network "forwarded_port", guest: 80, host: 8000
+    #node1.vm.network "forwarded_port", guest: 8080, host: 8080
+    config.vm.synced_folder "goprom/", "/home/vagrant/goprom"
+	  node3.vm.provision "shell", path: "add_hosts.sh"
+    node3.vm.provision "shell", path: "install_docker_centos.sh"
+  end
+
+end
