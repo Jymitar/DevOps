@@ -1,0 +1,73 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+  config.vm.post_up_message = "This is the start up message!"
+
+  $puppet = <<PUPPET
+    wget https://apt.puppet.com/puppet7-release-bullseye.deb
+    sudo dpkg -i puppet7-release-bullseye.deb
+    sudo apt-get update
+    sudo apt-get install -y puppet-agent
+PUPPET
+
+  $modulesweb = <<MODULESWEB
+    puppet module install puppetlabs-vcsrepo
+    puppet module install puppetlabs/stdlib
+    sudo cp -vR ~/.puppetlabs/etc/code/modules/ /etc/puppetlabs/code/
+MODULESWEB
+
+  $modulesdb = <<MODULESDB
+  puppet module install puppetlabs/mysql
+  puppet module install puppetlabs-vcsrepo
+  sudo cp -vR ~/.puppetlabs/etc/code/modules/ /etc/puppetlabs/code/
+MODULESDB
+
+  config.vm.define "containers" do |containers|
+    containers.vm.box = "Jmy/centos9-vmware"
+    containers.vm.hostname = "containers.do2.exam"
+    containers.vm.network "private_network", ip: "192.168.69.100"
+    
+    containers.vm.provision "shell", path: "containers.sh"
+
+    containers.vm.provision "ansible_local" do |ansible|
+      ansible.become = true
+      ansible.install_mode = :default
+      ansible.playbook = "playbooks/docker.yml"
+      ansible.galaxy_role_file = "playbooks/docker-role.yml"
+      ansible.galaxy_roles_path = "/etc/ansible/roles"
+      ansible.galaxy_command = "sudo ansible-galaxy install --role-file=%{role_file} --roles-path=%{roles_path} --force"
+    end
+    containers.vm.provision "shell", path: "terraform-apply.sh"
+  end
+
+  config.vm.define "web" do |web|
+    web.vm.box = "Jmy/debian11-vmware"
+    web.vm.hostname = "web.do2.exam"
+    web.vm.network "private_network", ip: "192.168.69.101"
+    web.vm.provision "shell", inline: $puppet, privileged: false
+    web.vm.provision "shell", inline: $modulesweb, privileged: false
+
+    web.vm.provision "puppet" do |puppet|
+      puppet.manifests_path = "manifests"
+      puppet.manifest_file = "web.pp"
+      puppet.options = "--verbose --debug"
+    end
+    web.vm.provision "shell", path: "restart-apache.sh"
+  end
+
+  config.vm.define "db" do |db|
+    db.vm.box = "Jmy/debian11-vmware"
+    db.vm.hostname = "db.do2.exam"
+    db.vm.network "private_network", ip: "192.168.69.102"
+    db.vm.provision "shell", inline: $puppet, privileged: false
+    db.vm.provision "shell", inline: $modulesdb, privileged: false
+
+    db.vm.provision "puppet" do |puppet|
+      puppet.manifests_path = "manifests"
+      puppet.manifest_file = "db.pp"
+      puppet.options = "--verbose --debug"
+    end
+  end
+end
