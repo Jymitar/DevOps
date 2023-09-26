@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Docker Hub Credentials
-CRED_NAME=jmy90
-CRED_PASS=dckr_pat_r0YlKGU8dlUgNTiWxiuKU6SBJMM
+CRED_NAME=<Login
+CRED_PASS=<PassKey>
 
 echo "* Stop Jenkins"
 systemctl stop jenkins
